@@ -26,6 +26,7 @@ roads = [
 
 
 redis_instance = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
+redis_instance.delete('cars')
 for road in roads:
     while True:
         time_start = time.perf_counter_ns()
@@ -40,13 +41,12 @@ for road in roads:
             for i in range(len(drive_line.queue)):
                 car = drive_line.queue[i]
                 moved = car.simulate(timedelta=0.1, queue_position=i)
-        cars = [car.to_dict() for car in road.get_first_line(True).queue]
+        cars = [car.to_dict() for car in road.get_first_line(False).queue]
         data = json.dumps(cars)
         redis_instance.set(
             'cars',
             data
         )
-        print(len(cars))
         sleep_time = 0.167 - time.perf_counter_ns() - time_start * 1e-9
         if sleep_time > 0.0:
             sleep(sleep_time)

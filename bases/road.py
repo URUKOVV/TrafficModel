@@ -102,7 +102,7 @@ class DriveLine:
     def can_recv(self):
         if self.direction:
             return not self.queue or Line(self.queue[-1].position, self.line.p1).distance() > DEFAULT_CAR_LENGTH
-        return not self.queue or Line(self.queue[-1].position, self.line.p2).distance() > DEFAULT_CAR_LENGTH
+        return not self.queue or Line(self.queue[-1].position, self.line.p1).distance() > DEFAULT_CAR_LENGTH
 
 
 class RoadPart:

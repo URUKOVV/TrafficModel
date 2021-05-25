@@ -2,7 +2,7 @@ import math
 
 from .primitives import SimulateMixin, Point
 
-DEFAULT_CAR_LENGTH = 4.5
+DEFAULT_CAR_LENGTH = 1
 
 
 class Car(SimulateMixin):
@@ -25,6 +25,7 @@ class Car(SimulateMixin):
 
     def simulate(self, timedelta: float, queue_position: int, drive_line=None):
         moved = False
+        next_car = None
         if not self.drive_line:
             assert drive_line
             self.drive_line = drive_line
@@ -51,6 +52,8 @@ class Car(SimulateMixin):
             distance_new_pos = math.dist((new_position.x, new_position.y), (line_start_point.x, line_start_point.y))
             # новая точка все еще находитя внутри полосы
             assert distance_new_pos < drive_line_distance
+            # между машинами соблюдается дистанция
+            assert distance_new_pos < drive_line_distance - int(bool(next_car)) * (DEFAULT_CAR_LENGTH + 0.5)
             self.position = new_position
             moved = True
         except AssertionError:
