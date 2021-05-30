@@ -3,6 +3,7 @@ import math
 from .primitives import SimulateMixin, Point
 
 DEFAULT_CAR_LENGTH = 1
+DEFAULT_CAR_SPEED = 0.5
 
 
 class Car(SimulateMixin):
@@ -46,8 +47,8 @@ class Car(SimulateMixin):
             # проверка на то, что авто находится внутри полосы движения (между точки p1 и p2)
             assert distance_p1 < drive_line_distance
             new_position = Point(
-                self.position.x + self.drive_line.line_vector.x * timedelta,
-                self.position.y + self.drive_line.line_vector.y * timedelta
+                self.position.x + self.drive_line.line_vector.x * timedelta * DEFAULT_CAR_SPEED,
+                self.position.y + self.drive_line.line_vector.y * timedelta * DEFAULT_CAR_SPEED
             )
             distance_new_pos = math.dist((new_position.x, new_position.y), (line_start_point.x, line_start_point.y))
             # новая точка все еще находитя внутри полосы

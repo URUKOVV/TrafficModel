@@ -9,61 +9,29 @@ from bases.road import DriveLine, RoadPart, CrossRoad
 from bases.car import Car
 from bases.primitives import Point, Line
 from time import sleep
+from simulation import CityModel
 
-roads = [
-    RoadPart(Point(0.0, 0.0), Point(10.0, 0.0))
-]
 
-# for road in roads:
-#     for drive_line in [road.get_first_line(True), road.get_first_line(False)]:
-#         if drive_line.can_recv():
-#             drive_line.queue.append(
-#                 Car(
-#                     position=drive_line.line.p1,
-#                     drive_line=drive_line
-#                 )
-#             )
-
+simulation_model = CityModel()
+simulation_model.add_road(RoadPart(point_1=Point(0.0, 0.0), point_2=Point(10.0, 0.0), auto_create_for_direction=True))
 
 redis_instance = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
 redis_instance.delete('cars')
-for road in roads:
-    while True:
-        time_start = time.perf_counter_ns()
-        for drive_line in [road.get_first_line(True), road.get_first_line(False)]:
-            if drive_line.can_recv():
-                drive_line.queue.append(
-                    Car(
-                        position=drive_line.line.p1,
-                        drive_line=drive_line,
-                    )
-                )
-            for i in range(len(drive_line.queue)):
-                car = drive_line.queue[i]
-                moved = car.simulate(timedelta=0.1, queue_position=i)
-        cars = [car.to_dict() for car in road.get_first_line(False).queue]
-        data = json.dumps(cars)
-        redis_instance.set(
-            'cars',
-            data
-        )
-        sleep_time = 0.167 - time.perf_counter_ns() - time_start * 1e-9
-        if sleep_time > 0.0:
-            sleep(sleep_time)
-            # симуляция 60 раз в секунду
 
+current_time = 0.0
+prev_time = 0.0
 
-        # data = [
-        #     {
-        #         'lines': [
-        #             {
-        #                 'line': {
-        #                     'p1': (line.line.p1.x, line.line.p1.y),
-        #                     'p2': (line.line.p2.x, line.line.p2.y),
-        #                 },
-        #                 'queue': [{'x': car.position.x, 'y': car.position.y} for car in line.queue],
-        #             } for line in [road.get_first_line(True), road.get_direction_lines(False)]
-        #         ]
-        #     } for road in roads
-        # ]
-        # redis_instance.set('roads', json.dumps(data))
+while True:
+    current_time = time.perf_counter_ns() * 1e-9
+    simulation_model.simulate(timedelta=current_time - prev_time)
+    prev_time = current_time
+    simulation_model_dict = simulation_model.to_dict()
+
+    redis_instance.set(
+        'traffic_model_data',
+        json.dumps(simulation_model_dict)
+    )
+    sleep_time = 0.167 - time.perf_counter_ns() - current_time
+    if sleep_time > 0.0:
+        sleep(sleep_time)
+        # симуляция 60 раз в секунду

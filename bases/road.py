@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 from typing import List
 from .car import Car, DEFAULT_CAR_LENGTH
 from .primitives import Point, Line
@@ -10,15 +9,15 @@ class Semaphore:
     GREEN = 1
     RED = 2
 
-    state: int # GREEN, RED
+    state: int  # GREEN, RED
 
     def __init__(self):
         self.state = self.RED
 
 
 class CrossRoad:
-    X_TYPE = 1 # Х-образный перекресток
-    T_TYPE = 2 # Т-образный перекресток
+    X_TYPE = 1  # Х-образный перекресток
+    T_TYPE = 2  # Т-образный перекресток
     type: int
     lines_map: dict
 
@@ -69,8 +68,9 @@ class DriveLine:
     # line.p1 начало, line.p2 конец
     line: Line
     line_vector: Point
+    auto_add_car: bool
 
-    def __init__(self, direction: bool):
+    def __init__(self, direction: bool, auto_add: bool = False):
         """
         :param direction: направление движения полосы относительно участка дороги
         """
@@ -78,6 +78,8 @@ class DriveLine:
         self.line = None
         self.line_vector = None
         self.queue = None
+        self.auto_add_car = auto_add
+        self.time_passed = 0.0
 
     def set_road(self, road: RoadPart):
         self.road = road
@@ -104,19 +106,38 @@ class DriveLine:
             return not self.queue or Line(self.queue[-1].position, self.line.p1).distance() > DEFAULT_CAR_LENGTH
         return not self.queue or Line(self.queue[-1].position, self.line.p1).distance() > DEFAULT_CAR_LENGTH
 
+    def simulate(self, timedelta: float):
+        for i in range(len(self.queue)):
+            car = self.queue[i]
+            car.simulate(timedelta=timedelta, queue_position=i)
+        if self.auto_add_car:
+            self.time_passed += timedelta
+            if self.time_passed >= 10.0:
+                self.time_passed = 0.0
+                if self.can_recv():
+                    self.queue.append(
+                        Car(
+                            position=self.line.p1,
+                            drive_line=self,
+                        )
+                    )
+
 
 class RoadPart:
+    ROAD_COUNT = 0
     line: Line
     forward_road_lines: List[DriveLine]
     backward_road_lines: List[DriveLine]
     length: float
     width: float
+    id: int
 
     def __init__(
             self,
             point_1: Point,
             point_2: Point,
             lines: List[DriveLine] = [],
+            auto_create_for_direction=None
     ):
         """
         :param lines: полосы движения назад
@@ -124,6 +145,7 @@ class RoadPart:
         """
         self.forward_road_lines = []
         self.backward_road_lines = []
+        self.id = RoadPart.inc_road_count()
         if lines:
             for line in lines:
                 if line.direction:
@@ -131,8 +153,12 @@ class RoadPart:
                 else:
                     self.backward_road_lines.append(line)
         else:
-            self.forward_road_lines.append(DriveLine(direction=True))
-            self.backward_road_lines.append(DriveLine(direction=False))
+            self.forward_road_lines.append(
+                DriveLine(direction=True, auto_add=bool(auto_create_for_direction == True))
+            )
+            self.backward_road_lines.append(
+                DriveLine(direction=False, auto_add=bool(auto_create_for_direction == False))
+            )
 
         self.line = Line(point_1, point_2)
         self.width = (len(self.forward_road_lines) + len(self.backward_road_lines)) * 2.5
@@ -143,7 +169,12 @@ class RoadPart:
         for line in self.backward_road_lines:
             line.set_road(road=self)
 
-    def get_direction_lines(self, direction: bool):
+    @classmethod
+    def inc_road_count(cls):
+        cls.ROAD_COUNT += 1
+        return cls.ROAD_COUNT
+
+    def get_direction_lines(self, direction: bool) -> List[DriveLine]:
         if direction:
             return self.forward_road_lines
         return self.backward_road_lines
@@ -157,3 +188,26 @@ class RoadPart:
         if direction:
             return self.forward_road_lines[0] if self.forward_road_lines else None
         return self.backward_road_lines[0] if self.backward_road_lines else None
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'position': {
+                'p1': {
+                    'x': self.line.p1.x,
+                    'y': self.line.p1.y,
+                },
+                'p2': {
+                    'x': self.line.p2.x,
+                    'y': self.line.p2.y
+                }
+            }
+        }
+
+    def get_cars(self):
+        cars = []
+        for drive_line in [self.get_first_line(True), self.get_first_line(False)]:
+            if drive_line:
+                for car in drive_line.queue:
+                    cars.append(car.to_dict())
+        return cars
