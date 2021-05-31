@@ -14,6 +14,12 @@ class Semaphore:
     def __init__(self):
         self.state = self.RED
 
+    def switch(self):
+        if self.state == self.GREEN:
+            self.state = self.RED
+        else:
+            self.state = self.GREEN
+
 
 class CrossRoad:
     X_TYPE = 1  # Х-образный перекресток
