@@ -14,6 +14,15 @@ from simulation import CityModel
 
 simulation_model = CityModel()
 simulation_model.add_road(RoadPart(point_1=Point(0.0, 0.0), point_2=Point(10.0, 0.0), auto_create_for_direction=True))
+simulation_model.add_road(RoadPart(point_1=Point(15, 0.0), point_2=Point(30.0, 0.0), auto_create_for_direction=False))
+simulation_model.add_road(
+    RoadPart(
+        point_1=Point(x=12.5, y=2.5),
+        point_2=Point(x=12.5, y=17.5),
+        auto_create_for_direction=False,
+        rotation_angle=math.pi/2
+    )
+)
 
 redis_instance = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
 redis_instance.delete('cars')

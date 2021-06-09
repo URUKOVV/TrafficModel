@@ -3,7 +3,7 @@ import math
 from .primitives import SimulateMixin, Point
 
 DEFAULT_CAR_LENGTH = 1
-DEFAULT_CAR_SPEED = 0.5
+DEFAULT_CAR_SPEED = 1.5
 
 
 class Car(SimulateMixin):
@@ -34,7 +34,6 @@ class Car(SimulateMixin):
             drive_line_distance = self.drive_line.line.distance()
         else:
             next_car = self.drive_line.queue[queue_position - 1]
-            # todo надо смотреть на позицию впереди стоящего авто между ними должна быть дистанция ддлина / 2 + расстояние между авто
             drive_line_distance = math.dist(
                 (self.drive_line.line.p1.x, self.drive_line.line.p1.y),
                 (next_car.position.x, next_car.position.y)
@@ -52,7 +51,11 @@ class Car(SimulateMixin):
             )
             distance_new_pos = math.dist((new_position.x, new_position.y), (line_start_point.x, line_start_point.y))
             # новая точка все еще находитя внутри полосы
-            assert distance_new_pos < drive_line_distance
+            if queue_position == 0 and distance_new_pos >= drive_line_distance:
+                if self.drive_line.can_release():
+                    self.drive_line.release_car()
+            else:
+                assert distance_new_pos < drive_line_distance
             # между машинами соблюдается дистанция
             assert distance_new_pos < drive_line_distance - int(bool(next_car)) * (DEFAULT_CAR_LENGTH + 0.5)
             self.position = new_position

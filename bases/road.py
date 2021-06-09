@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import math
 from typing import List
 from .car import Car, DEFAULT_CAR_LENGTH
 from .primitives import Point, Line
+
+
+DEFAULT_TIME_SWITCH = 30.0
 
 
 class Semaphore:
@@ -10,15 +14,25 @@ class Semaphore:
     RED = 2
 
     state: int  # GREEN, RED
+    position: Point
+    time_passed: float
 
-    def __init__(self):
+    def __init__(self, position: Point):
         self.state = self.RED
+        self.time_passed = 0.0
+        self.position = position
 
     def switch(self):
         if self.state == self.GREEN:
             self.state = self.RED
         else:
             self.state = self.GREEN
+
+    def simulate(self, timedelta: float):
+        self.time_passed += timedelta
+        if self.time_passed >= DEFAULT_TIME_SWITCH:
+            self.time_passed = 0.0
+            self.switch()
 
 
 class CrossRoad:
@@ -28,8 +42,8 @@ class CrossRoad:
     lines_map: dict
 
     def __init__(self, left_road: RoadPart, right_road: RoadPart, forward_road: RoadPart, backward_road: RoadPart):
-        road_lines = [left_road, forward_road, right_road, backward_road]
-        count = len(list(filter(lambda road: road is not None, road_lines)))
+        roads = [left_road, forward_road, right_road, backward_road]
+        count = len(list(filter(lambda road: road is not None, roads)))
         if count < 3:
             raise ValueError('Required at least 3 roads')
         if count == 3:
@@ -42,29 +56,29 @@ class CrossRoad:
 
         direction_flag = True
         for _ in range(0, 4):
-            road = road_lines[0]
+            road = roads[0]
             if road:
                 line = road.get_first_line(direction=direction_flag)
                 if line:
                     allowed_lines = []
-                    oncoming_road = road_lines[2]
+                    oncoming_road = roads[2]
                     if oncoming_road:
                         line = oncoming_road.get_first_line(direction=direction_flag)
                         if line:
                             allowed_lines.append(line)
-                    left_relative_road = road_lines[1]
+                    left_relative_road = roads[1]
                     if left_relative_road:
                         line = left_relative_road.get_first_line(direction=direction_flag)
                         if line:
                             allowed_lines.append(line)
-                    right_relative_road = road_lines[3]
+                    right_relative_road = roads[3]
                     if right_relative_road:
                         line = right_relative_road.get_first_line(direction=not direction_flag)
                         if line:
                             allowed_lines.append(line)
                     self.lines_map[line] = allowed_lines
             direction_flag = not direction_flag
-            road_lines.append(road_lines.pop(0))
+            roads.append(roads.pop(0))
 
 
 class DriveLine:
@@ -75,6 +89,7 @@ class DriveLine:
     line: Line
     line_vector: Point
     auto_add_car: bool
+    semaphore: Semaphore
 
     def __init__(self, direction: bool, auto_add: bool = False):
         """
@@ -90,32 +105,49 @@ class DriveLine:
     def set_road(self, road: RoadPart):
         self.road = road
         self.queue = []
-        p1 = road.line.p1
-        p2 = road.line.p2
+        # p1 = road.line.p1
+        # p2 = road.line.p2
         # equal_x = bool(math.fabs(p1.x - p2.x) < 0.001)
         # equal_y = bool(math.fabs(p1.y - p2.y) < 0.001)
         # if equal_y and equal_x:
         #     raise ValueError('Точки не могут быть одинаковыми')
         # if equal_x:
         if self.direction:
-            self.line = road.line
+            self.line = Line(road.line.p1, road.line.p2)
+            self.semaphore = Semaphore(position=road.line.p2)
         else:
             self.line = Line(road.line.p2, road.line.p1)
+            self.semaphore = Semaphore(position=road.line.p1)
         diff_x = self.line.p2.x - self.line.p1.x
         diff_y = self.line.p2.y - self.line.p1.y
         vector_x = 1.0 if diff_x > 0 else 0 if diff_x == 0.0 else -1
         vector_y = 1.0 if diff_y > 0 else 0 if diff_y == 0.0 else -1
         self.line_vector = Point(vector_x, vector_y)
 
+        # перенос полосы от центра дороги
+        angle = math.pi / 2
+        x = 1.5 * (self.line_vector.x * math.cos(angle) - self.line_vector.y * math.sin(angle))
+        y = 1.5 * (self.line_vector.y * math.cos(angle) + self.line_vector.x * math.sin(angle))
+        self.line = Line(Point(self.line.p1.x + x, self.line.p1.y + y), Point(self.line.p2.x + x, self.line.p2.y + y))
+
     def can_recv(self):
         if self.direction:
             return not self.queue or Line(self.queue[-1].position, self.line.p1).distance() > DEFAULT_CAR_LENGTH
         return not self.queue or Line(self.queue[-1].position, self.line.p1).distance() > DEFAULT_CAR_LENGTH
 
+    def can_release(self):
+        return not bool(self.semaphore) or self.semaphore.state == self.semaphore.GREEN
+
+    def release_car(self):
+        self.queue.pop(0)
+
     def simulate(self, timedelta: float):
+        if self.semaphore:
+            self.semaphore.simulate(timedelta=timedelta)
         for i in range(len(self.queue)):
-            car = self.queue[i]
-            car.simulate(timedelta=timedelta, queue_position=i)
+            if i + 1 <= len(self.queue):
+                car = self.queue[i]
+                car.simulate(timedelta=timedelta, queue_position=i)
         if self.auto_add_car:
             self.time_passed += timedelta
             if self.time_passed >= 10.0:
@@ -137,13 +169,15 @@ class RoadPart:
     length: float
     width: float
     id: int
+    rotation_angle: float
 
     def __init__(
             self,
             point_1: Point,
             point_2: Point,
             lines: List[DriveLine] = [],
-            auto_create_for_direction=None
+            auto_create_for_direction=None,
+            rotation_angle=None
     ):
         """
         :param lines: полосы движения назад
@@ -151,6 +185,7 @@ class RoadPart:
         """
         self.forward_road_lines = []
         self.backward_road_lines = []
+        self.rotation_angle = rotation_angle
         self.id = RoadPart.inc_road_count()
         if lines:
             for line in lines:
@@ -206,7 +241,8 @@ class RoadPart:
                 'p2': {
                     'x': self.line.p2.x,
                     'y': self.line.p2.y
-                }
+                },
+                'angle': self.rotation_angle
             }
         }
 
