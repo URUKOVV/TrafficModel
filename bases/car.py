@@ -24,7 +24,7 @@ class Car(SimulateMixin):
         cls.CAR_COUNT += 1
         return cls.CAR_COUNT
 
-    def simulate(self, timedelta: float, queue_position: int, drive_line=None):
+    def simulate(self, timedelta: float, queue_position: int = None, drive_line=None):
         moved = False
         next_car = None
         if not self.drive_line:
@@ -50,10 +50,18 @@ class Car(SimulateMixin):
                 self.position.y + self.drive_line.line_vector.y * timedelta * DEFAULT_CAR_SPEED
             )
             distance_new_pos = math.dist((new_position.x, new_position.y), (line_start_point.x, line_start_point.y))
-            # новая точка все еще находитя внутри полосы
+            # новая точка все еще находится внутри полосы
             if queue_position == 0 and distance_new_pos >= drive_line_distance:
                 if self.drive_line.can_release():
-                    self.drive_line.release_car()
+                    if len(self.drive_line.paths) == 0:
+                        self.drive_line.release_car()
+                    else:
+                        for i in range(len(self.drive_line.paths)):
+                            line = self.drive_line.paths[i]
+
+                    next_drive_line = self.drive_line.paths[rnd]
+
+                    next_drive_line.add_car(self)
             else:
                 assert distance_new_pos < drive_line_distance
             # между машинами соблюдается дистанция

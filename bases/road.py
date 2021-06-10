@@ -40,45 +40,26 @@ class CrossRoad:
     T_TYPE = 2  # Т-образный перекресток
     type: int
     lines_map: dict
+    roads: List[RoadPart]
+    left_road: RoadPart
+    position: Point
 
-    def __init__(self, left_road: RoadPart, right_road: RoadPart, forward_road: RoadPart, backward_road: RoadPart):
-        roads = [left_road, forward_road, right_road, backward_road]
-        count = len(list(filter(lambda road: road is not None, roads)))
+    def __init__(self, roads: List[RoadPart], position: Point):
+        count = len(roads)
         if count < 3:
             raise ValueError('Required at least 3 roads')
-        if count == 3:
+        elif count == 3:
             self.type = self.T_TYPE
         elif count == 4:
             self.type = self.X_TYPE
+        elif count > 4:
+            raise ValueError('Max roads is 4')
 
-        # сопоставление доступных полос
-        self.lines_map = {}
+        self.position = position
+        self.roads = roads
 
-        direction_flag = True
-        for _ in range(0, 4):
-            road = roads[0]
-            if road:
-                line = road.get_first_line(direction=direction_flag)
-                if line:
-                    allowed_lines = []
-                    oncoming_road = roads[2]
-                    if oncoming_road:
-                        line = oncoming_road.get_first_line(direction=direction_flag)
-                        if line:
-                            allowed_lines.append(line)
-                    left_relative_road = roads[1]
-                    if left_relative_road:
-                        line = left_relative_road.get_first_line(direction=direction_flag)
-                        if line:
-                            allowed_lines.append(line)
-                    right_relative_road = roads[3]
-                    if right_relative_road:
-                        line = right_relative_road.get_first_line(direction=not direction_flag)
-                        if line:
-                            allowed_lines.append(line)
-                    self.lines_map[line] = allowed_lines
-            direction_flag = not direction_flag
-            roads.append(roads.pop(0))
+    def simulate(self, timedelta: float):
+        pass
 
 
 class DriveLine:
@@ -90,6 +71,7 @@ class DriveLine:
     line_vector: Point
     auto_add_car: bool
     semaphore: Semaphore
+    paths: List[DriveLine]
 
     def __init__(self, direction: bool, auto_add: bool = False):
         """
@@ -139,7 +121,7 @@ class DriveLine:
         return not bool(self.semaphore) or self.semaphore.state == self.semaphore.GREEN
 
     def release_car(self):
-        self.queue.pop(0)
+        return self.queue.pop(0)
 
     def simulate(self, timedelta: float):
         if self.semaphore:
@@ -159,6 +141,31 @@ class DriveLine:
                             drive_line=self,
                         )
                     )
+
+    def add_car(self, car: Car):
+        if self.can_recv():
+            self.queue.append(car)
+        else:
+            raise ValueError('Check before add!!!')
+
+    def is_intersect(self, line2: DriveLine):
+        xdiff = (self.line.p1.x - self.line.p2.x, line2.line.p1.x - line2.line.p2.x)
+        ydiff = (self.line.p1.y - self.line.p2.y, line2.line.p1.y - line2.line.p2.y)
+
+        def det(a, b):
+            return a[0] * b[1] - a[1] * b[0]
+
+        div = det(xdiff, ydiff)
+        if div == 0:
+            return False
+        return True
+        # d = (
+        #     det((self.line.p1.x, self.line.p1.y), (self.line.p2.x, self.line.p2.y)),
+        #     det((line2.line.p1.x, line2.line.p1.y), (self.line.p2.x, self.line.p2.y))
+        # )
+        # x = det(d, xdiff) / div
+        # y = det(d, ydiff) / div
+        # return Point(x, y)
 
 
 class RoadPart:
