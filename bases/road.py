@@ -39,9 +39,10 @@ class CrossRoad:
     X_TYPE = 1  # Х-образный перекресток
     T_TYPE = 2  # Т-образный перекресток
     type: int
-    lines_map: dict
     roads: List[RoadPart]
-    left_road: RoadPart
+    lines: List[DriveLine]  # полосы движения перекрестка
+    incoming_lines: List[DriveLine]  # входящие полосы движения
+    outcoming_lines: List[DriveLine]  # исходящие полосы движения
     position: Point
 
     def __init__(self, roads: List[RoadPart], position: Point):
@@ -58,8 +59,46 @@ class CrossRoad:
         self.position = position
         self.roads = roads
 
+        self.incoming_lines = []
+        self.outcoming_lines = []
+        self.lines = []
+
+        for i in range(len(self.roads)):
+            road = self.roads[i]
+            road_lines = [road.get_first_line(True), road.get_first_line(False)]
+            for j in range(len(road_lines)):
+                road_line = road_lines[j]
+                distance_to_end_of_line = math.dist(
+                    (self.position.x, self.position.y), (road_line.line.p2.x, road_line.line.p2.y)
+                )
+                distance_to_start_of_line = math.dist(
+                    (self.position.x, self.position.y), (road_line.line.p1.x, road_line.line.p1.y)
+                )
+                # входящая полоса движения
+                if distance_to_end_of_line < distance_to_start_of_line:
+                    self.incoming_lines.append(road_line)
+                # исходящая полоса движения
+                elif distance_to_end_of_line > distance_to_start_of_line:
+                    self.outcoming_lines.append(road_line)
+
+        for i in range(len(self.incoming_lines)):
+            incoming_line = self.incoming_lines[i]
+            # нужно получить список возможных путей
+            for j in range(len(self.outcoming_lines)):
+                outcoming_line = self.outcoming_lines[j]
+                if outcoming_line.road.id == incoming_line.road.id:
+                    continue
+                cross_line = DriveLine(
+                    direction=False,
+                    line=Line(incoming_line.line.p2, outcoming_line.line.p1)
+                )
+                cross_line.add_path(outcoming_line)
+                incoming_line.add_path(cross_line)
+                self.lines.append(cross_line)
+
     def simulate(self, timedelta: float):
-        pass
+        for i in range(len(self.lines)):
+            self.lines[i].simulate(timedelta=timedelta)
 
 
 class DriveLine:
@@ -73,16 +112,18 @@ class DriveLine:
     semaphore: Semaphore
     paths: List[DriveLine]
 
-    def __init__(self, direction: bool, auto_add: bool = False):
+    def __init__(self, direction: bool, auto_add: bool = False, line: Line = None):
         """
         :param direction: направление движения полосы относительно участка дороги
         """
         self.direction = direction
-        self.line = None
-        self.line_vector = None
-        self.queue = None
+        self.line = line
+        self.line_vector = self.get_line_vector()
+        self.queue = []
         self.auto_add_car = auto_add
         self.time_passed = 0.0
+        self.paths = []
+        self.semaphore = None
 
     def set_road(self, road: RoadPart):
         self.road = road
@@ -100,17 +141,22 @@ class DriveLine:
         else:
             self.line = Line(road.line.p2, road.line.p1)
             self.semaphore = Semaphore(position=road.line.p1)
-        diff_x = self.line.p2.x - self.line.p1.x
-        diff_y = self.line.p2.y - self.line.p1.y
-        vector_x = 1.0 if diff_x > 0 else 0 if diff_x == 0.0 else -1
-        vector_y = 1.0 if diff_y > 0 else 0 if diff_y == 0.0 else -1
-        self.line_vector = Point(vector_x, vector_y)
+        self.line_vector = self.get_line_vector()
 
         # перенос полосы от центра дороги
         angle = math.pi / 2
         x = 1.5 * (self.line_vector.x * math.cos(angle) - self.line_vector.y * math.sin(angle))
         y = 1.5 * (self.line_vector.y * math.cos(angle) + self.line_vector.x * math.sin(angle))
         self.line = Line(Point(self.line.p1.x + x, self.line.p1.y + y), Point(self.line.p2.x + x, self.line.p2.y + y))
+
+    def get_line_vector(self):
+        if self.line:
+            diff_x = self.line.p2.x - self.line.p1.x
+            diff_y = self.line.p2.y - self.line.p1.y
+            vector_x = 1.0 if diff_x > 0 else 0 if diff_x == 0.0 else -1
+            vector_y = 1.0 if diff_y > 0 else 0 if diff_y == 0.0 else -1
+            return Point(vector_x, vector_y)
+        return None
 
     def can_recv(self):
         if self.direction:
@@ -147,6 +193,9 @@ class DriveLine:
             self.queue.append(car)
         else:
             raise ValueError('Check before add!!!')
+
+    def add_path(self, drive_line: DriveLine):
+        self.paths.append(drive_line)
 
     def is_intersect(self, line2: DriveLine):
         xdiff = (self.line.p1.x - self.line.p2.x, line2.line.p1.x - line2.line.p2.x)

@@ -1,4 +1,5 @@
 import math
+import random
 
 from .primitives import SimulateMixin, Point
 
@@ -56,12 +57,10 @@ class Car(SimulateMixin):
                     if len(self.drive_line.paths) == 0:
                         self.drive_line.release_car()
                     else:
-                        for i in range(len(self.drive_line.paths)):
-                            line = self.drive_line.paths[i]
-
-                    next_drive_line = self.drive_line.paths[rnd]
-
-                    next_drive_line.add_car(self)
+                        next_drive_line = self.drive_line.paths[random.randint(0, len(self.drive_line.paths) - 1)]
+                        if next_drive_line.can_recv():
+                            next_drive_line.add_car(self)
+                            self.drive_line = next_drive_line
             else:
                 assert distance_new_pos < drive_line_distance
             # между машинами соблюдается дистанция

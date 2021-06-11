@@ -31,3 +31,6 @@ class CityModel(SimulateMixin):
 
     def add_road(self, road: RoadPart):
         self.__roads.append(road)
+
+    def add_cross_road(self, cross_road: CrossRoad):
+        self.__cross_roads.append(cross_road)
