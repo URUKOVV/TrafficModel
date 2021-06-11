@@ -18,6 +18,7 @@ class Car(SimulateMixin):
         self.average_wait_time = 0.0
         self.position = position
         self.drive_line = drive_line
+        self.next_drive_line = None
         self.id = Car.inc_car_count()
 
     @classmethod
@@ -57,10 +58,15 @@ class Car(SimulateMixin):
                     if len(self.drive_line.paths) == 0:
                         self.drive_line.release_car()
                     else:
-                        next_drive_line = self.drive_line.paths[random.randint(0, len(self.drive_line.paths) - 1)]
-                        if next_drive_line.can_recv():
-                            next_drive_line.add_car(self)
-                            self.drive_line = next_drive_line
+                        if not self.next_drive_line:
+                            self.next_drive_line = self.drive_line.paths[
+                                random.randint(0, len(self.drive_line.paths) - 1)
+                            ]
+                        if self.next_drive_line.can_recv():
+                            self.drive_line.release_car()
+                            self.drive_line = self.next_drive_line
+                            self.next_drive_line = None
+                            self.drive_line.add_car(self)
             else:
                 assert distance_new_pos < drive_line_distance
             # между машинами соблюдается дистанция

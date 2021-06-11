@@ -100,6 +100,13 @@ class CrossRoad:
         for i in range(len(self.lines)):
             self.lines[i].simulate(timedelta=timedelta)
 
+    def get_cars(self):
+        cars = []
+        for i in range(len(self.lines)):
+            queue = self.lines[i].queue
+            for j in range(len(queue)):
+                cars.append(queue[j].to_dict())
+        return cars
 
 class DriveLine:
     direction: bool

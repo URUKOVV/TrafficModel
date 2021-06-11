@@ -24,6 +24,10 @@ class CityModel(SimulateMixin):
             road_cars = road.get_cars()
             for car in road_cars:
                 cars.append(car)
+        for cross_road in self.__cross_roads:
+            cross_road_cars = cross_road.get_cars()
+            for car in cross_road_cars:
+                cars.append(car)
         return {
             'roads': [road.to_dict() for road in self.__roads],
             'cars': cars
