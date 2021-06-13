@@ -67,6 +67,9 @@ class Car(SimulateMixin):
                             self.drive_line = self.next_drive_line
                             self.next_drive_line = None
                             self.drive_line.add_car(self)
+                            self.position = self.drive_line.line.p1
+                            moved = True
+                            return moved
             else:
                 assert distance_new_pos < drive_line_distance
             # между машинами соблюдается дистанция

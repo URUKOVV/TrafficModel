@@ -10,17 +10,25 @@ DEFAULT_TIME_SWITCH = 30.0
 
 
 class Semaphore:
+    SEMAPHORE_COUNT = 0
     GREEN = 1
     RED = 2
 
     state: int  # GREEN, RED
     position: Point
     time_passed: float
+    id: int
 
     def __init__(self, position: Point):
         self.state = self.RED
         self.time_passed = 0.0
         self.position = position
+        self.id = Semaphore.inc_semaphore_count()
+
+    @classmethod
+    def inc_semaphore_count(cls):
+        cls.SEMAPHORE_COUNT += 1
+        return cls.SEMAPHORE_COUNT
 
     def switch(self):
         if self.state == self.GREEN:
@@ -34,8 +42,25 @@ class Semaphore:
             self.time_passed = 0.0
             self.switch()
 
+    def enable(self):
+        self.state = self.GREEN
+
+    def disable(self):
+        self.state = self.RED
+
+    def to_dict(self):
+        return {
+            'position': {
+                'x': self.position.x,
+                'y': self.position.y
+            },
+            'id': self.id
+        }
+
 
 class CrossRoad:
+    ENABLED_X_LINES = 1
+    ENABLED_Y_LINES = 2
     X_TYPE = 1  # Х-образный перекресток
     T_TYPE = 2  # Т-образный перекресток
     type: int
@@ -44,6 +69,12 @@ class CrossRoad:
     incoming_lines: List[DriveLine]  # входящие полосы движения
     outcoming_lines: List[DriveLine]  # исходящие полосы движения
     position: Point
+    switch_time_passed: float
+    time_to_switch: float
+
+    x_vector_lines: List[DriveLine]
+    y_vector_lines: List[DriveLine]
+    state: int # enabled 1 - x_vector_lines, 2 - y_vector_lines
 
     def __init__(self, roads: List[RoadPart], position: Point):
         count = len(roads)
@@ -58,10 +89,15 @@ class CrossRoad:
 
         self.position = position
         self.roads = roads
+        self.time_to_switch = DEFAULT_TIME_SWITCH
 
         self.incoming_lines = []
         self.outcoming_lines = []
+        self.y_vector_lines = []
+        self.x_vector_lines = []
         self.lines = []
+        self.state = self.ENABLED_X_LINES
+        self.switch_time_passed = 0.0
 
         for i in range(len(self.roads)):
             road = self.roads[i]
@@ -76,7 +112,12 @@ class CrossRoad:
                 )
                 # входящая полоса движения
                 if distance_to_end_of_line < distance_to_start_of_line:
+                    road_line.set_semaphore(Semaphore(position=road_line.line.p2))
                     self.incoming_lines.append(road_line)
+                    if math.fabs(road_line.line_vector.x):
+                        self.x_vector_lines.append(road_line)
+                    elif math.fabs(road_line.line_vector.y):
+                        self.y_vector_lines.append(road_line)
                 # исходящая полоса движения
                 elif distance_to_end_of_line > distance_to_start_of_line:
                     self.outcoming_lines.append(road_line)
@@ -96,9 +137,15 @@ class CrossRoad:
                 incoming_line.add_path(cross_line)
                 self.lines.append(cross_line)
 
+        self.switch_state()
+
     def simulate(self, timedelta: float):
         for i in range(len(self.lines)):
             self.lines[i].simulate(timedelta=timedelta)
+        self.switch_time_passed += timedelta
+        if self.switch_time_passed >= self.time_to_switch:
+            self.switch_time_passed = 0.0
+            self.switch_state()
 
     def get_cars(self):
         cars = []
@@ -107,6 +154,32 @@ class CrossRoad:
             for j in range(len(queue)):
                 cars.append(queue[j].to_dict())
         return cars
+
+    def disable_lines(self, line_type):
+        if line_type == self.ENABLED_X_LINES:
+            for i in range(len(self.x_vector_lines)):
+                self.x_vector_lines[i].semaphore.disable()
+        elif line_type == self.ENABLED_Y_LINES:
+            for i in range(len(self.y_vector_lines)):
+                self.y_vector_lines[i].semaphore.disable()
+
+    def enable_lines(self, line_type):
+        if line_type == self.ENABLED_X_LINES:
+            for i in range(len(self.x_vector_lines)):
+                self.x_vector_lines[i].semaphore.enable()
+        elif line_type == self.ENABLED_Y_LINES:
+            for i in range(len(self.y_vector_lines)):
+                self.y_vector_lines[i].semaphore.enable()
+
+    def switch_state(self):
+        self.disable_lines(self.state)
+        if self.state == self.ENABLED_X_LINES:
+            self.state = self.ENABLED_Y_LINES
+        else:
+            self.state = self.ENABLED_X_LINES
+
+        self.enable_lines(self.state)
+
 
 class DriveLine:
     direction: bool
@@ -135,19 +208,10 @@ class DriveLine:
     def set_road(self, road: RoadPart):
         self.road = road
         self.queue = []
-        # p1 = road.line.p1
-        # p2 = road.line.p2
-        # equal_x = bool(math.fabs(p1.x - p2.x) < 0.001)
-        # equal_y = bool(math.fabs(p1.y - p2.y) < 0.001)
-        # if equal_y and equal_x:
-        #     raise ValueError('Точки не могут быть одинаковыми')
-        # if equal_x:
         if self.direction:
             self.line = Line(road.line.p1, road.line.p2)
-            self.semaphore = Semaphore(position=road.line.p2)
         else:
             self.line = Line(road.line.p2, road.line.p1)
-            self.semaphore = Semaphore(position=road.line.p1)
         self.line_vector = self.get_line_vector()
 
         # перенос полосы от центра дороги
@@ -155,6 +219,9 @@ class DriveLine:
         x = 1.5 * (self.line_vector.x * math.cos(angle) - self.line_vector.y * math.sin(angle))
         y = 1.5 * (self.line_vector.y * math.cos(angle) + self.line_vector.x * math.sin(angle))
         self.line = Line(Point(self.line.p1.x + x, self.line.p1.y + y), Point(self.line.p2.x + x, self.line.p2.y + y))
+
+    def set_semaphore(self, semaphore):
+        self.semaphore = semaphore
 
     def get_line_vector(self):
         if self.line:
@@ -177,8 +244,6 @@ class DriveLine:
         return self.queue.pop(0)
 
     def simulate(self, timedelta: float):
-        if self.semaphore:
-            self.semaphore.simulate(timedelta=timedelta)
         for i in range(len(self.queue)):
             if i + 1 <= len(self.queue):
                 car = self.queue[i]
@@ -316,3 +381,10 @@ class RoadPart:
                 for car in drive_line.queue:
                     cars.append(car.to_dict())
         return cars
+
+    def get_semaphores(self):
+        semaphores = []
+        line = self.get_first_line(True)
+        if line.semaphore:
+            semaphores.append(line.semaphore.to_dict())
+        return semaphores
