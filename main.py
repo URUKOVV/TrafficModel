@@ -47,7 +47,11 @@ roads.append(RoadPart(point_1=line4.p1, point_2=line4.p2, rotation_angle=math.pi
 line1, line2, line3, line4 = gen_lines_around(Point(20.0, 20.0))
 
 roads.append(RoadPart(point_1=line1.p1, point_2=line1.p2, auto_create_for_direction=False))  # 13
-roads.append(RoadPart(point_1=line4.p1, point_2=line4.p2, auto_create_for_direction=False, rotation_angle=math.pi/2))  # 14
+roads.append(
+    RoadPart(
+        point_1=line4.p1, point_2=line4.p2, auto_create_for_direction=False, rotation_angle=math.pi/2
+    )
+)  # 14
 
 for i in range(len(roads)):
     road = roads[i]
