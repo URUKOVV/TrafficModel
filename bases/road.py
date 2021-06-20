@@ -50,6 +50,7 @@ class Semaphore:
 
     def to_dict(self):
         return {
+            'state': self.state,
             'position': {
                 'x': self.position.x,
                 'y': self.position.y
@@ -59,6 +60,8 @@ class Semaphore:
 
 
 class CrossRoad:
+    CROSS_ROAD_COUNT = 0
+
     ENABLED_X_LINES = 1
     ENABLED_Y_LINES = 2
     X_TYPE = 1  # Х-образный перекресток
@@ -75,6 +78,7 @@ class CrossRoad:
     x_vector_lines: List[DriveLine]
     y_vector_lines: List[DriveLine]
     state: int # enabled 1 - x_vector_lines, 2 - y_vector_lines
+    id: int
 
     def __init__(self, roads: List[RoadPart], position: Point):
         count = len(roads)
@@ -98,6 +102,7 @@ class CrossRoad:
         self.lines = []
         self.state = self.ENABLED_X_LINES
         self.switch_time_passed = 0.0
+        self.id = CrossRoad.inc_cross_road_count()
 
         for i in range(len(self.roads)):
             road = self.roads[i]
@@ -179,6 +184,20 @@ class CrossRoad:
             self.state = self.ENABLED_X_LINES
 
         self.enable_lines(self.state)
+
+    @classmethod
+    def inc_cross_road_count(cls):
+        cls.CROSS_ROAD_COUNT += 1
+        return cls.CROSS_ROAD_COUNT
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'position': {
+                'x': self.position.x,
+                'y': self.position.y
+            }
+        }
 
 
 class DriveLine:
@@ -385,6 +404,9 @@ class RoadPart:
     def get_semaphores(self):
         semaphores = []
         line = self.get_first_line(True)
+        if line.semaphore:
+            semaphores.append(line.semaphore.to_dict())
+        line = self.get_first_line(False)
         if line.semaphore:
             semaphores.append(line.semaphore.to_dict())
         return semaphores

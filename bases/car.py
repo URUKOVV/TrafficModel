@@ -47,7 +47,9 @@ class Car(SimulateMixin):
                 (self.drive_line.line.p1.x, self.drive_line.line.p1.y),
                 (next_car.position.x, next_car.position.y)
             )
-            if next_car.state == Car.STATE_STOPPED and math.dist((self.position.x, self.position.y), (next_car.position.x, next_car.position.y)) == DEFAULT_CAR_LENGTH + 0.5:
+            if next_car.state == Car.STATE_STOPPED and math.dist(
+                    (self.position.x, self.position.y), (next_car.position.x, next_car.position.y)
+            ) == DEFAULT_CAR_LENGTH + 0.5:
                 return moved
         if self.state == self.STATE_STOPPED:
             self.delay_passed += timedelta
@@ -68,7 +70,9 @@ class Car(SimulateMixin):
                 self.position.x + self.drive_line.line_vector.x * timedelta * self.speed,
                 self.position.y + self.drive_line.line_vector.y * timedelta * self.speed
             )
-            distance_new_pos = math.dist((new_position.x, new_position.y), (line_start_point.x, line_start_point.y))
+            distance_new_pos = math.dist(
+                (new_position.x, new_position.y), (line_start_point.x, line_start_point.y)
+            )
             # новая точка все еще находится внутри полосы
             if queue_position == 0 and distance_new_pos >= drive_line_distance:
                 if self.drive_line.can_release():

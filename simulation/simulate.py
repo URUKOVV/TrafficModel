@@ -21,6 +21,7 @@ class CityModel(SimulateMixin):
     def to_dict(self):
         cars = []
         semaphores = []
+        cross_roads = []
         for road in self.__roads:
             road_semaphores = road.get_semaphores()
             for semaphore in road_semaphores:
@@ -29,6 +30,7 @@ class CityModel(SimulateMixin):
             for car in road_cars:
                 cars.append(car)
         for cross_road in self.__cross_roads:
+            cross_roads.append(cross_road.to_dict())
             cross_road_cars = cross_road.get_cars()
             for car in cross_road_cars:
                 cars.append(car)
@@ -36,6 +38,7 @@ class CityModel(SimulateMixin):
             'roads': [road.to_dict() for road in self.__roads],
             'cars': cars,
             'semaphores': semaphores,
+            'crossRoads': cross_roads,
         }
 
     def add_road(self, road: RoadPart):
